@@ -9,8 +9,11 @@
 //   Copyright(c) 2010 LearnBoost <dev@learnboost.com>
 //   MIT Licensed
 
+var http = require('http');
 var https = require('https');
 var url = require('url');
+
+var http_modules = {http: http, https: https};
 
 
 function merge(a, b) {
@@ -110,7 +113,8 @@ exports.createClient = function(options) {
       headers: headers
     };
 
-    return https.request(opts);
+    var protocol = client.storage_url.protocol.replace(':', '');
+    return http_modules[protocol].request(opts);
   };
 
   client.put = function put(filename, headers) {
