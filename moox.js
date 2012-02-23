@@ -297,5 +297,12 @@ exports.createClient = function createClient(options) {
     return request;
   };
 
+  client.authenticated = false;
+
+  client.authenticate = function(callback) {
+    client.authenticated = true;
+    callback();
+  };
+
   return client;
 };
