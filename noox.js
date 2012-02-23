@@ -76,9 +76,9 @@ exports.createClient = function(options) {
           err.headers = res.headers;
           callback(err);
         } else {
+          client.authenticated = true;
           client.storage_url = url.parse(storage_url);
           client.auth_token = auth_token;
-          client.authenticated_ts = Date.now();
           callback();
         }
       });
@@ -92,7 +92,7 @@ exports.createClient = function(options) {
   };
 
   var request = function(method, filename, headers) {
-    if (!client.auth_token) { throw new Error('noox client not authenticated. Call the .authenticate() function.'); }
+    if (!client.authenticated) { throw new Error('noox client not authenticated. Call the .authenticate() function.'); }
     var date = new Date;
     var headers = headers || {};
     var url_path = client.storage_url.path + '/'+ options.container + '/' + filename;
