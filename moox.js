@@ -47,6 +47,7 @@ function fakeWritableStream() {
   self.writable = true;
   self.write = function(chunk, enc) { return true; };
   self.end = self.destroy = self.destroySoon = function() { self.writable = false; };
+  self.setTimeout = function() {};
   
   return self;
 }
@@ -59,6 +60,7 @@ function wrapWritableStream(ws) {
   self.end = function(chunk, enc) { self.writable = false; if (chunk) self.write(chunk, enc); };
   self.destroy = function() { self.writable = false; ws.destroy(); }
   self.destroySoon = function() { self.writable = false; ws.destroySoon(); };
+  self.setTimeout = function() {};
 
   ws.on('drain', function() { self.emit('drain'); });
   ws.on('error', function(err) { self.writeable = false; });
