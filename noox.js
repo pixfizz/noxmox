@@ -84,6 +84,12 @@ exports.createClient = function(options) {
       });
     });
 
+    req.setTimeout(15 * 1000, function() {
+      req.abort();
+      var err = new Error('Object storage authentication request timed out.');
+      callback(err);
+    });
+
     req.on('error', function(err) {
       callback(err);
     });
