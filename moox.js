@@ -57,13 +57,13 @@ function wrapWritableStream(ws) {
 
   self.writable = true;
   self.write = function(chunk, enc) { return ws.write(chunk, enc); };
-  self.end = function(chunk, enc) { self.writable = false; if (chunk) self.write(chunk, enc); };
+  self.end = function(chunk, enc) { self.writable = false; if (chunk) self.write(chunk, enc); ws.end(); };
   self.destroy = function() { self.writable = false; ws.destroy(); }
   self.destroySoon = function() { self.writable = false; ws.destroySoon(); };
   self.setTimeout = function() {};
 
   ws.on('drain', function() { self.emit('drain'); });
-  ws.on('error', function(err) { self.writeable = false; });
+  ws.on('error', function(err) { self.writable = false; });
   ws.on('close', function() { self.emit('close'); });
   ws.on('pipe', function(src) { self.emit('pipe', src); });
 
@@ -79,13 +79,13 @@ exports.createClient = function createClient(options) {
   }
 
   // create storage dir, if it doesn't exists
-  if (!path.existsSync(options.prefix)) {
+  if (!fs.existsSync(options.prefix)) {
     fs.mkdirSync(options.prefix, 0777);
   }
   
   // create container dir, if it does not exists
   var containerPath = path.join(options.prefix, options.container);
-  if (!path.existsSync(containerPath)) {
+  if (!fs.existsSync(containerPath)) {
     fs.mkdirSync(containerPath, 0777);
   }
 
@@ -96,7 +96,7 @@ exports.createClient = function createClient(options) {
       // ensure that the path to the file exists
       createRecursive(path.dirname(filePath));
       function createRecursive(p) {
-        if (path.existsSync(p) || p === containerPath) return;
+        if (fs.existsSync(p) || p === containerPath) return;
         createRecursive(path.join(p, '..'));
         fs.mkdirSync(p, 0777);
       }
@@ -225,11 +225,11 @@ exports.createClient = function createClient(options) {
 
       rs.on('open', function() {
         // file is ready, emit response
-        emitResponse(request, {response:response, hasbody:true}) 
+        emitResponse(request, {response:response, hasbody:true})
       });
       rs.on('error', function(err) {
         // emit response indicating the file read error
-        emitResponse(500, {code:'InternalError', msg:err.message});
+        emitResponse(request, {code:500, err:{code:'InternalError', msg:err.message}});
       });
     });
 
