@@ -40,7 +40,7 @@ function wrapReadableStream(rs) {
 
 function fakeWritableStream() {
   var ws = new stream.Writable();
-  ws._write = function() {};
+  ws._write = function(chunk, encoding, callback) { callback(); };
   ws.setTimeout = function() {};
   return ws;
 }
