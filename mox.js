@@ -35,7 +35,7 @@ function wrapReadableStream(rs) {
   rs.on('error', function(err) { self.readable = false; });
   rs.on('close', function() { self.emit('close'); });
 
-  return self;
+  return new stream.Readable().wrap(self);
 }
 
 function fakeWritableStream() {
