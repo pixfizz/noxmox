@@ -10,16 +10,13 @@ var fs = require('fs');
 var events = require('events');
 var path = require('path');
 var util = require('util');
+var stream = require('stream');
 
 
 function fakeReadableStream() {
-  var self = new events.EventEmitter();
-
-  self.readable = true;
-  self.setEncoding = self.pause = self.resume = self.pipe = function() {};
-  self.destroy = self.destroySoon = function() { self.readable = false; }
-
-  return self;
+  var rs = new stream.Readable();
+  rs._read = function(size) {};
+  return rs;
 }
 
 function wrapReadableStream(rs) {
@@ -42,14 +39,10 @@ function wrapReadableStream(rs) {
 }
 
 function fakeWritableStream() {
-  var self = new events.EventEmitter();
-  
-  self.writable = true;
-  self.write = function(chunk, enc) { return true; };
-  self.end = self.destroy = self.destroySoon = function() { self.writable = false; };
-  self.setTimeout = function() {};
-  
-  return self;
+  var ws = new stream.Writable();
+  ws._write = function() {};
+  ws.setTimeout = function() {};
+  return ws;
 }
 
 function wrapWritableStream(ws) {
