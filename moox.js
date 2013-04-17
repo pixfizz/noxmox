@@ -46,9 +46,10 @@ function fakeWritableStream() {
 }
 
 function wrapWritableStream(ws) {
-  var self = new events.EventEmitter();
+  var self = new stream.Writable();
 
   self.writable = true;
+  self._write = ws._write;
   self.write = function(chunk, enc) { return ws.write(chunk, enc); };
   self.end = function(chunk, enc) { self.writable = false; if (chunk) self.write(chunk, enc); ws.end(); };
   self.destroy = function() { self.writable = false; ws.destroy(); }
