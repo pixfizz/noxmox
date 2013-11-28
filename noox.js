@@ -35,6 +35,10 @@ function merge(a, b) {
 //      user: username
 //       key: api key
 // container: container name
+//
+// Optional:
+// protocol: 'http' or 'https' - force use of this protocol instead of
+//                               the one specified in X-Storage-Url
 exports.createClient = function(options) {
   if (!options.host) throw new Error('"host" required');
   if (!options.user) throw new Error('"user" required');
@@ -124,7 +128,7 @@ exports.createClient = function(options) {
       headers: headers
     });
 
-    var protocol = client.storage_url.protocol.replace(':', '');
+    var protocol = options.protocol || client.storage_url.protocol.replace(':', '');
     return http_modules[protocol].request(opts);
   };
 
