@@ -17,10 +17,14 @@ var auth = require('./auth')
 
 
 function merge(a, b) {
-  Object.keys(b).forEach(function(key) {
-    a[key] = b[key]
+  var o = {};
+  Object.keys(a).forEach(function(key) {
+    o[key] = a[key];
   });
-  return a;
+  Object.keys(b).forEach(function(key) {
+    o[key] = b[key];
+  });
+  return o;
 }
 
 
@@ -49,12 +53,13 @@ exports.createClient = function(options) {
     endpoint = bucket + '.s3.amazonaws.com';
   }
 
-  function request(method, filename, headers) {
+  function request(method, filename, headers, http_opts) {
     var date = new Date;
-    var headers = headers || {};
+    headers = headers || {};
+    http_opts = http_opts || {};
 
     // Default headers
-    merge(headers, {
+    headers = merge(headers, {
       Date:date.toUTCString(),
       Host:endpoint
     });
@@ -72,35 +77,35 @@ exports.createClient = function(options) {
     });
 
     // Issue request
-    var opts = {
+    var opts = merge(http_opts, {
       host:endpoint,
       port:80,
       method:method,
       path:path.join('/', filename),
       headers:headers
-    };
+    });
 
     return http.request(opts);
   }
 
   var client = new function() {};
 
-  client.put = function put(filename, headers) {
+  client.put = function put(filename, headers, opts) {
     headers.Expect = '100-continue';
-    return request('PUT', filename, headers);
+    return request('PUT', filename, headers, opts);
   };
 
-  client.get = function get(filename, headers) {
-    return request('GET', filename, headers);
+  client.get = function get(filename, headers, opts) {
+    return request('GET', filename, headers, opts);
   };
 
-  client.head = function head(filename, headers) {
-    return request('HEAD', filename, headers);
+  client.head = function head(filename, headers, opts) {
+    return request('HEAD', filename, headers, opts);
   };
 
   // Delete file
-  client.del = function del(filename, headers) {
-    return request('DELETE', filename, headers);
+  client.del = function del(filename, headers, opts) {
+    return request('DELETE', filename, headers, opts);
   };
 
   // Return an S3 presigned url to the given `filename`.

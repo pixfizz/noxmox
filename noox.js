@@ -17,10 +17,14 @@ var http_modules = {http: http, https: https};
 
 
 function merge(a, b) {
-  Object.keys(b).forEach(function(key) {
-    a[key] = b[key]
+  var o = {};
+  Object.keys(a).forEach(function(key) {
+    o[key] = a[key];
   });
-  return a;
+  Object.keys(b).forEach(function(key) {
+    o[key] = b[key];
+  });
+  return o;
 }
 
 
@@ -97,48 +101,49 @@ exports.createClient = function(options) {
     req.end();
   };
 
-  var request = function(method, filename, headers) {
+  var request = function(method, filename, headers, http_opts) {
     if (!client.authenticated) { throw new Error('noox client not authenticated. Call the .authenticate() function.'); }
     var date = new Date;
-    var headers = headers || {};
     var url_path = client.storage_url.path + '/'+ options.container + '/' + filename;
+    headers = headers || {};
+    http_opts = http_opts || {};
 
     // Default headers
-    merge(headers, {
+    headers = merge(headers, {
       'Date': date.toUTCString(),
       'Host': options.host,
       'X-Auth-Token': client.auth_token
     });
 
     // Issue request
-    var opts = {
+    var opts = merge(http_opts, {
       host: client.storage_url.host,
       port: client.storage_url.port,
       method: method,
       path: url_path,
       headers: headers
-    };
+    });
 
     var protocol = client.storage_url.protocol.replace(':', '');
     return http_modules[protocol].request(opts);
   };
 
-  client.put = function put(filename, headers) {
+  client.put = function put(filename, headers, opts) {
     headers.Expect = '100-continue';
-    return request('PUT', filename, headers);
+    return request('PUT', filename, headers, opts);
   };
 
-  client.get = function get(filename, headers) {
-    return request('GET', filename, headers);
+  client.get = function get(filename, headers, opts) {
+    return request('GET', filename, headers, opts);
   };
 
-  client.head = function head(filename, headers) {
-    return request('HEAD', filename, headers);
+  client.head = function head(filename, headers, opts) {
+    return request('HEAD', filename, headers, opts);
   };
 
   // Delete file
-  client.del = function del(filename, headers) {
-    return request('DELETE', filename, headers);
+  client.del = function del(filename, headers, opts) {
+    return request('DELETE', filename, headers, opts);
   };
 
   return client;
