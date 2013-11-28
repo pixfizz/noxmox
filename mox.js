@@ -78,7 +78,11 @@ exports.createClient = function createClient(options) {
   }
 
   if (!options.prefix) {
-    options.prefix = '/tmp/mox';
+    if (process.platform === "win32") {
+      options.prefix = process.env["TEMP"] + "/mox";
+    } else {
+      options.prefix = '/tmp/mox';
+    }
   }
 
   // create storage dir, if it doesn't exists
@@ -92,21 +96,22 @@ exports.createClient = function createClient(options) {
     fs.mkdirSync(bucketPath, 0777);
   }
 
-
-  function getFilePath(filename, createPath) {
-    var filePath = path.join(bucketPath, filename);
-    if (createPath) {
-      // ensure that the path to the file exists
-      createRecursive(path.dirname(filePath));
-      function createRecursive(p) {
-        if (fs.existsSync(p) || p === bucketPath) return;
-        createRecursive(path.join(p, '..'));
-        fs.mkdirSync(p, 0777);
+  // map S3 keyname to filename
+  function getFilePath(keyname, newFile) {
+    // Backward incompatible (version <= 0.2.3) check for existing file
+    if (!newFile) {
+      var oldFilePath = path.join(bucketPath, keyname);
+      if (fs.existsSync(oldFilePath)) {
+        return oldFilePath;
       }
     }
-    return filePath;
+    // The new naming scheme:
+    // encode keyname using the fixedEncodeURIComponent from
+    // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/encodeURIComponent
+    var filename = encodeURIComponent(keyname).replace(
+      /[!'()]/g, escape).replace(/\*/g, "%2A");
+    return path.join(bucketPath, filename);
   }
-
 
   function emitResponse(request, opts) {
     if (request.responseEmitted) {
@@ -299,12 +304,12 @@ exports.createClient = function createClient(options) {
   };
 
   client.url =
-  client.http = function(filename){
-    return (filename)
+  client.http = function(filename) {
+    return (options.domain || '').replace("https:","http:") + filename;
   };
 
   client.https = function(filename){
-    return (filename)
+    return (options.domain || '').replace("http:", "https:") + filename;
   };
 
   return client;
