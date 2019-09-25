@@ -41,16 +41,16 @@ exports.createClient = function(options) {
 
   var bucket;
   var endpoint;
-  
+
   if (options.bucket.match(/\.amazonaws\.com$/)) {
     // bucket includes the endpoint
-    endpoint = options.bucket;
+    endpoint = options.endpoint || options.bucket;
     bucket = options.bucket.match(/(.*)\.([\w\-]+)\.amazonaws\.com$/)[1];
   }
   else {
     // assume default endpoint
     bucket = options.bucket;
-    endpoint = bucket + '.s3.amazonaws.com';
+    endpoint = options.endpoint || bucket + '.s3.amazonaws.com';
   }
 
   function request(method, filename, headers, http_opts) {
