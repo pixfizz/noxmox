@@ -39,18 +39,24 @@ exports.createClient = function(options) {
   if (!options.secret) throw new Error('aws "secret" required');
   if (!options.bucket) throw new Error('aws "bucket" required');
 
+  var region = options.region || 'us-east-1';
+
   var bucket;
   var endpoint;
+  var basepath = '/';
 
-  if (options.bucket.match(/\.amazonaws\.com$/)) {
+  if (options.endpoint) {
+    endpoint = options.endpoint;
+    bucket = options.bucket;
+    basepath = '/' + bucket;
+  } else if (options.bucket.match(/\.amazonaws\.com$/)) {
     // bucket includes the endpoint
-    endpoint = options.endpoint || options.bucket;
+    endpoint = options.bucket;
     bucket = options.bucket.match(/(.*)\.([\w\-]+)\.amazonaws\.com$/)[1];
-  }
-  else {
+  } else {
     // assume default endpoint
     bucket = options.bucket;
-    endpoint = options.endpoint || bucket + '.s3.amazonaws.com';
+    endpoint = bucket + '.s3.amazonaws.com';
   }
 
   function request(method, filename, headers, http_opts) {
@@ -61,19 +67,21 @@ exports.createClient = function(options) {
     // Default headers
     headers = merge(headers, {
       Date:date.toUTCString(),
-      Host:endpoint
+      Host:endpoint,
+      'x-amz-date': auth.timeStamp(date)
     });
+
+    var pathname = path.join(basepath, filename);
 
     // Authorization header
     headers.Authorization = auth.authorization({
       key:options.key,
       secret:options.secret,
+      region:region,
       verb:method,
       date:date,
-      resource:auth.canonicalizeResource(path.join('/', bucket, filename)),
-      contentType:headers['Content-Type'],
-      md5:headers['Content-MD5'],
-      amazonHeaders:auth.canonicalizeHeaders(headers)
+      path:pathname,
+      headers: headers,
     });
 
     // Issue request
@@ -81,7 +89,7 @@ exports.createClient = function(options) {
       host:endpoint,
       port:80,
       method:method,
-      path:path.join('/', filename),
+      path:pathname,
       headers:headers
     });
 
@@ -109,6 +117,7 @@ exports.createClient = function(options) {
   };
 
   // Return an S3 presigned url to the given `filename`.
+  // TODO: Port to AWS4.
   client.signedUrl = function signedUrl(filename, expiration) {
     var epoch = Math.floor(expiration.getTime()/1000);
     var signature = auth.signQuery({

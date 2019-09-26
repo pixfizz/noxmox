@@ -1,190 +1,120 @@
+// Produces AWS v4 signature header.
 
-/*!
- * knox - auth
- * Copyright(c) 2010 LearnBoost <dev@learnboost.com>
- * MIT Licensed
- */
+var crypto = require('crypto');
+var parse = require('url').parse;
 
-/**
- * Module dependencies.
- */
 
-var crypto = require('crypto')
-  , parse = require('url').parse;
-
-/**
- * Valid keys.
- */
-
-var keys = [
-    'acl'
-  , 'location'
-  , 'logging'
-  , 'notification'
-  , 'partNumber'
-  , 'policy'
-  , 'requestPayment'
-  , 'torrent'
-  , 'uploadId'
-  , 'uploads'
-  , 'versionId'
-  , 'versioning'
-  , 'versions'
-  , 'website'
-];
-
-/**
- * Return an "Authorization" header value with the given `options`
- * in the form of "AWS <key>:<signature>"
- *
- * @param {Object} options
- * @return {String}
- * @api private
- */
-
-exports.authorization = function(options){
-  return 'AWS ' + options.key + ':' + exports.sign(options);
-};
-
-/**
- * Simple HMAC-SHA1 Wrapper
- *
- * @param {Object} options
- * @return {String}
- * @api private
- */ 
-
-exports.hmacSha1 = function(options){
-  return crypto.createHmac('sha1', options.secret).update(options.message).digest('base64');
-};
-
-/**
- * Create a base64 sha1 HMAC for `options`. 
- * 
- * @param {Object} options
- * @return {String}
- * @api private
- */
-
-exports.sign = function(options){
-  options.message = exports.stringToSign(options);
-  return exports.hmacSha1(options);
-};
-
-/**
- * Create a base64 sha1 HMAC for `options`. 
- *
- * Specifically to be used with S3 presigned URLs
- * 
- * @param {Object} options
- * @return {String}
- * @api private
- */
-
-exports.signQuery = function(options){
-  options.message = exports.queryStringToSign(options);
-  return exports.hmacSha1(options);
-};
-
-/**
- * Return a string for sign() with the given `options`.
- *
- * Spec:
- * 
- *    <verb>\n
- *    <md5>\n
- *    <content-type>\n
- *    <date>\n
- *    [headers\n]
- *    <resource>
- *
- * @param {Object} options
- * @return {String}
- * @api private
- */
-
-exports.stringToSign = function(options){
-  var headers = options.amazonHeaders || '';
-  if (headers) headers += '\n';
+exports.authorization = function(options) {
   return [
-      options.verb
-    , options.md5
-    , options.contentType
-    , options.date.toUTCString()
-    , headers + options.resource
-  ].join('\n');
+    'AWS4-HMAC-SHA256 ',
+    'Credential=',
+    credential(options),
+    ',SignedHeaders=',
+    signedHeaders(options.headers),
+    ',Signature=',
+    signature(options)
+  ].join('');
 };
 
-/**
- * Return a string for sign() with the given `options`, but is meant exclusively
- * for S3 presigned URLs
- *
- * Spec:
- * 
- *    <date>\n
- *    <resource>
- *
- * @param {Object} options
- * @return {String}
- * @api private
- */
+function credential(options) {
+  return options.key + '/' + scope(options);
+}
 
-exports.queryStringToSign = function(options){
-  return 'GET\n\n\n' +
-    options.date + '\n' +
-    options.resource;
-};
+function scope(options) {
+  return dateStamp(options.date) + '/' + options.region + '/s3/aws4_request';
+}
 
-/**
- * Perform the following:
- *
- *  - ignore non-amazon headers
- *  - lowercase fields
- *  - sort lexicographically
- *  - trim whitespace between ":"
- *  - join with newline
- *
- * @param {Object} headers
- * @return {String}
- * @api private
- */
-
-exports.canonicalizeHeaders = function(headers){
-  var buf = []
-    , fields = Object.keys(headers);
-  for (var i = 0, len = fields.length; i < len; ++i) {
-    var field = fields[i]
-      , val = headers[field]
-      , field = field.toLowerCase();
-    if (0 !== field.indexOf('x-amz')) continue;
-    buf.push(field + ':' + val);
+function dateStamp(date) {
+  var y = date.getUTCFullYear().toString();
+  var m = (date.getUTCMonth() + 1).toString();
+  var d = date.getUTCDate().toString();
+  if (m.length === 1) {
+    m = '0' + m;
   }
-  return buf.sort().join('\n');
-};
+  if (d.length === 1) {
+    d = '0' + d;
+  }
+  return y + m + d;
+}
 
-/**
- * Perform the following:
- *
- *  - ignore non sub-resources
- *  - sort lexicographically
- *
- * @param {String} resource
- * @return {String}
- * @api private
- */
+function signedHeaders(headers) {
+  var keys = Object.keys(headers);
+  var buf = [];
+  for (var i = 0; i < keys.length; i++) {
+    buf.push(keys[i].toLowerCase());
+  }
+  buf.sort();
+  return buf.join(';');
+}
 
-exports.canonicalizeResource = function(resource){
-  var url = parse(resource, true)
-    , path = url.pathname
-    , buf = [];
+function signature(options) {
+  return hmacSha256(stringToSign(options), signingKey(options), 'hex');
+}
 
-  Object.keys(url.query).forEach(function(key){
-    if (!~keys.indexOf(key)) return;
-    var val = '' == url.query[key] ? '' : '=' + encodeURIComponent(url.query[key]);
-    buf.push(key + val);
-  });
+function stringToSign(options) {
+  return [
+    'AWS4-HMAC-SHA256',
+    timeStamp(options.date),
+    scope(options),
+    sha256(canonicalRequest(options))
+  ].join('\n');
+}
 
-  return path + (buf.length
-    ? '?' + buf.sort().join('&')
-    : '');
+function timeStamp(date) {
+  var h = date.getUTCHours().toString();
+  var m = date.getUTCMinutes().toString();
+  var s = date.getUTCSeconds().toString();
+  if (h.length === 1) {
+    h = '0' + h;
+  }
+  if (m.length === 1) {
+    m = '0' + m;
+  }
+  if (s.length === 1) {
+    s = '0' + s;
+  }
+  return dateStamp(date) + 'T' + h + m + s + 'Z';
+}
+
+exports.timeStamp = timeStamp;
+
+function canonicalRequest(options) {
+  return [
+    options.verb,
+    options.path,
+    '',  // empty query string
+    canonicalHeaders(options.headers),
+    signedHeaders(options.headers),
+    hashedPayload(options)
+  ].join('\n');
+}
+
+function canonicalHeaders(headers) {
+  var keys = Object.keys(headers);
+  var buf = [];
+  for (var i = 0; i < keys.length; i++) {
+    buf.push(keys[i].toLowerCase() + ':' + headers[keys[i]].toString().trim() + '\n');
+  }
+  buf.sort();
+  return buf.join('');
+}
+
+function hashedPayload(options) {
+  // If the request has no payload, use sha256 hash of an empty string.
+  return options.headers['x-amz-content-sha256'] || 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
+}
+
+function signingKey(options) {
+  var dateKey = hmacSha256(dateStamp(options.date), 'AWS4' + options.secret);
+  var dateRegionKey = hmacSha256(options.region, dateKey);
+  var dateRegionServiceKey = hmacSha256('s3', dateRegionKey);
+  return hmacSha256('aws4_request', dateRegionServiceKey);
+}
+
+function sha256(str) {
+  return crypto.createHash('sha256').update(str).digest('hex');
+}
+
+function hmacSha256(str, secret, encoding) {
+  return crypto.createHmac('sha256', secret).update(str).digest(encoding);
 };
